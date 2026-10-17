@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "name": "Mario Kart 8 Deluxe",
+  "title_id": "0100152000022000",
+  "compatibility": "Mush8-specific",
+  "notice": "Reference game profile. Current Mush8/MK8 behavior is left intact."
+}

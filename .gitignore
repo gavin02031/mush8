@@ -1,0 +1,23 @@
+# Do not put copyrighted game payloads, console keys, or extracted game code in Git.
+*.nsp
+*.NSP
+*.xci
+*.XCI
+*.nca
+*.NCA
+*.nso
+*.NSO
+prod.keys
+**/prod.keys
+**/ExeFS/
+**/exefs/
+**/RomFS/
+**/romfs/
+**/private-patched/
+**/local-work/
+work/
+target/
+build/
+.DS_Store
+__pycache__/
+*.pyc
