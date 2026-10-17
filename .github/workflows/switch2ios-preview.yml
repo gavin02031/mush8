@@ -16,6 +16,13 @@ permissions:
   contents: read
 
 jobs:
+  preflight-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run synthetic NSO inspection tests (no copyrighted data)
+        run: python3 -m unittest discover -s switch2ios/tests -p 'test_*.py' -v
   ios-preview:
     runs-on: macos-latest
     timeout-minutes: 40
