@@ -1,0 +1,58 @@
+name: Switch2iOS unsigned iOS preview
+on:
+  push:
+    branches:
+      - feature/switch2ios-odyssey
+    paths:
+      - 'switch2ios/**'
+      - '.github/workflows/switch2ios-preview.yml'
+  pull_request:
+    paths:
+      - 'switch2ios/**'
+      - '.github/workflows/switch2ios-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-preview:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Check Apple build tools
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: |
+          cd switch2ios/ios
+          xcodegen generate
+      - name: Compile native iOS app without signing
+        run: |
+          xcodebuild \
+            -project switch2ios/ios/Switch2iOS.xcodeproj \
+            -scheme Switch2iOS \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/switch2ios-derived" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Package unsigned preview IPA
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/switch2ios-derived/Build/Products/Release-iphoneos/Switch2iOS.app"
+          test -d "$APP"
+          mkdir -p dist/Payload
+          cp -R "$APP" dist/Payload/
+          (cd dist && zip -qry Switch2iOS-preview-UNSIGNED.ipa Payload)
+      - name: Publish preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Switch2iOS-preview-UNSIGNED
+          path: dist/Switch2iOS-preview-UNSIGNED.ipa
+          if-no-files-found: error
+          retention-days: 14

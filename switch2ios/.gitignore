@@ -1,0 +1,12 @@
+# Never commit private game files, extracted copyrighted content, or console keys.
+local-work/
+*.nsp
+*.xci
+*.nca
+*.nso
+prod.keys
+*.keys
+ios/*.xcodeproj/
+ios/build/
+*.ipa
+.DS_Store
