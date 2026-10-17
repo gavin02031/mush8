@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "name": "Super Mario Odyssey",
+  "title_id": "0100000000010000",
+  "compatibility": "unknown",
+  "notice": "Actual Odyssey module IDs and SDK must be detected from locally extracted ExeFS; this is not a playable port."
+}
