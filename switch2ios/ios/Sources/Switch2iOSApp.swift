@@ -11,13 +11,6 @@ struct Switch2iOSApp: App {
     }
 }
 
-private struct DumpInspection {
-    let filename: String
-    let byteCount: Int64
-    let kind: String
-    let detail: String
-}
-
 private struct StatusTile: View {
     let icon: String
     let title: String
@@ -46,7 +39,9 @@ private struct StatusTile: View {
 
 struct PortLibraryView: View {
     @State private var showImporter = false
-    @State private var inspection: DumpInspection?
+    @State private var report: NSPInspectionReport?
+    @State private var reportFile: URL?
+    @State private var filename: String?
     @State private var errorMessage: String?
 
     private let lavender = Color(red: 0.75, green: 0.75, blue: 1)
@@ -99,7 +94,7 @@ struct PortLibraryView: View {
                     Text("Local file inspection")
                         .font(.title3.bold())
 
-                    Text("Inspect the header of your own NSP dump. This preview never uploads or stores the selected file and does not attempt to run game code.")
+                    Text("Inspect the NSP file list directly on your iPhone. Your game dump stays on your device and is not uploaded or copied.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -128,27 +123,47 @@ struct PortLibraryView: View {
                         }
                     }
 
-                    if let current = inspection {
+                    if let current = report {
                         StatusTile(
-                            icon: "doc.text.magnifyingglass",
-                            title: current.filename,
-                            detail: "\(current.kind) · \(ByteCountFormatter.string(fromByteCount: current.byteCount, countStyle: .file))\n\(current.detail)"
+                            icon: "checkmark.shield",
+                            title: current.recognizedGame ?? "NSP package recognized",
+                            detail: "\(current.packageRole) · \(ByteCountFormatter.string(fromByteCount: Int64(current.totalBytes), countStyle: .file))\nTitle ID: \(current.titleId ?? "Not found")"
                         )
+                        StatusTile(
+                            icon: "square.stack.3d.up",
+                            title: "Package contents",
+                            detail: "\(current.entryCount) entries · \(current.ncaCount) NCA archives\nTicket: \(current.hasTicket ? "Found" : "Not found") · Certificate: \(current.hasCertificate ? "Found" : "Not found")\nGame version: not yet verified"
+                        )
+                        Text("This report does not include game data, keys, or file paths. It cannot yet verify the game's compatibility.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        if let reportFile {
+                            ShareLink(item: reportFile, preview: SharePreview("Switch2iOS NSP report")) {
+                                Label("Share metadata report (.json)", systemImage: "square.and.arrow.up")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 15)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(background)
+                            .background(lavender, in: RoundedRectangle(cornerRadius: 16))
+                        }
                     }
 
                     if let errorMessage {
-                        StatusTile(icon: "exclamationmark.triangle", title: "File inspection failed", detail: errorMessage)
+                        StatusTile(icon: "exclamationmark.triangle", title: "Inspection failed", detail: errorMessage)
                     }
 
                     Text("Porting pipeline")
                         .font(.title3.bold())
                         .padding(.top, 3)
 
-                    StatusTile(icon: "1.circle.fill", title: "Inspect", detail: "Read your own game dump metadata locally.")
-                    StatusTile(icon: "2.circle.fill", title: "Adapt", detail: "Develop per-game ARM64 patches, Switch services, graphics and shaders on a computer.")
-                    StatusTile(icon: "3.circle.fill", title: "Build", detail: "Compile and sign a separate native IPA using an Apple toolchain.")
+                    StatusTile(icon: "1.circle.fill", title: "Inspect", detail: "Read local NSP package metadata without uploading the game.")
+                    StatusTile(icon: "2.circle.fill", title: "Adapt", detail: "Develop Odyssey-specific ARM64 patches, Switch services and Metal shaders.")
+                    StatusTile(icon: "3.circle.fill", title: "Build", detail: "Compile a standalone playable app once game compatibility has been demonstrated.")
 
-                    Text("This app is a native project dashboard, not an emulator or automatic game converter. No Odyssey executable or Nintendo files are bundled.")
+                    Text("Switch2iOS is a developer dashboard, not an emulator or automatic converter. No Odyssey executable or Nintendo files are bundled.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 18)
@@ -162,28 +177,24 @@ struct PortLibraryView: View {
 
     private func inspect(_ url: URL) {
         errorMessage = nil
+        report = nil
+        reportFile = nil
+        filename = nil
         let granted = url.startAccessingSecurityScopedResource()
         defer {
             if granted { url.stopAccessingSecurityScopedResource() }
         }
         do {
-            let values = try url.resourceValues(forKeys: [.fileSizeKey])
-            let handle = try FileHandle(forReadingFrom: url)
-            defer { try? handle.close() }
-            let header = try handle.read(upToCount: 16) ?? Data()
-            let isNSP = header.starts(with: Data("PFS0".utf8))
-            let kind = isNSP ? "NSP container header found" : "Unrecognized or unsupported header"
-            let detail = isNSP
-                ? "Container identified. Compatibility and ownership are not determined by this scan."
-                : "Only the NSP/PFS0 header is recognized by this preview; no game data was extracted."
-            inspection = DumpInspection(
-                filename: url.lastPathComponent,
-                byteCount: Int64(values.fileSize ?? 0),
-                kind: kind,
-                detail: detail
-            )
+            let result = try NSPInspector.inspect(url)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let json = try encoder.encode(result)
+            let destination = FileManager.default.temporaryDirectory.appendingPathComponent("Switch2iOS-NSP-Report.json")
+            try json.write(to: destination, options: .atomic)
+            report = result
+            reportFile = destination
+            filename = url.lastPathComponent
         } catch {
-            inspection = nil
             errorMessage = error.localizedDescription
         }
     }
